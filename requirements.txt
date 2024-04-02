@@ -1,2 +1,12 @@
 opencv-python==4.9.0.80
 ultralytics==8.1.29
+torch==2.2.1+cu121
+torchsummary==1.5.1
+torchaudio==2.2.1+cu121
+torcheval==0.0.7
+tqdm==4.66.2
+soundfile==0.12.1
+sounddevice==0.4.6
+matplotlib==3.8.3
+numpy==1.26.4
+seaborn==0.13.2
