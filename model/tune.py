@@ -9,13 +9,10 @@ from util import create_loader
 from train import train, validate
 
 
-def tune(train_loader, val_loader, epochs=20, iterations=10):
+def tune(model, loss_fn, train_loader, val_loader, epochs=20, iterations=10):
     learning_rates = torch.logspace(-4, -2, iterations)
     best_hyperparameters = {}
     best_f1 = 0
-
-    model = DualPathNet(num_classes=NUM_CLASSES).to(DEVICE)
-    loss_fn = nn.CrossEntropyLoss()
 
     for i, lr in enumerate(learning_rates):
         print(f'\nIteration {i + 1}/{iterations}: Tuning with lr={lr}, epochs={epochs}\n')
@@ -36,10 +33,12 @@ def tune(train_loader, val_loader, epochs=20, iterations=10):
 
 def main():
     mel_spec = MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=1024, hop_length=512, n_mels=64).to(DEVICE)
+    model = DualPathNet(num_classes=NUM_CLASSES).to(DEVICE)
+    loss_fn = nn.CrossEntropyLoss()
     train_loader = create_loader(TRAIN_DIR, mel_spec, SAMPLE_RATE, NUM_SAMPLES, BATCH_SIZE)
     val_loader = create_loader(VAL_DIR, mel_spec, SAMPLE_RATE, NUM_SAMPLES, BATCH_SIZE, augment=False)
 
-    best_hyperparameters = tune(train_loader, val_loader, epochs=20, iterations=10)
+    best_hyperparameters = tune(model, loss_fn, train_loader, val_loader, epochs=20, iterations=10)
     print(f'Best hyperparameters: {best_hyperparameters}')
 
 
