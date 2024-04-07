@@ -1,3 +1,5 @@
+import os
+
 import torch
 
 BATCH_SIZE = 64
@@ -11,6 +13,12 @@ VAL_DIR = 'dataset/valid'
 TEST_DIR = 'dataset/test'
 NUM_CLASSES = 2
 
-SAVED_NAME = 'best.pt'
+SAVE_PATH = 'results'
+WEIGHTS_PATH = os.path.join(SAVE_PATH, 'best.pt')
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+class_mapping = [
+    'other',
+    'TM',
+]
