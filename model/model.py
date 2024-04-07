@@ -1,3 +1,9 @@
+"""
+Realization of the model architecture described in the article
+"Detection and classification of landmines using machine learning applied to metal detector data"
+Link to the article: https://doi.org/10.1080/0952813X.2020.1735529
+"""
+
 import torch
 import torch.nn as nn
 from torchsummary import summary
