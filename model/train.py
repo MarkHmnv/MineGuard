@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -7,14 +9,15 @@ from tqdm import tqdm
 from util import create_loader
 from model import DualPathNet
 from constants import (DEVICE, EPOCHS, SAMPLE_RATE, TRAIN_DIR,
-                       VAL_DIR, NUM_SAMPLES, BATCH_SIZE, NUM_CLASSES, LEARNING_RATE, TEST_DIR, SAVED_NAME)
+                       VAL_DIR, NUM_SAMPLES, BATCH_SIZE, NUM_CLASSES, LEARNING_RATE, TEST_DIR, WEIGHTS_PATH,
+                       class_mapping, SAVE_PATH)
 import torcheval.metrics.functional as M
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
 
-sns.set()
+sns.set_theme()
 
 
 def train_one_epoch(model, train_loader, loss_fn, optimizer):
@@ -31,10 +34,10 @@ def train_one_epoch(model, train_loader, loss_fn, optimizer):
     return running_loss / len(train_loader)
 
 
-def validate(model, val_loader, loss_fn):
+def validate(model, val_loader, loss_fn, testing=False):
     model.eval()
-    metrics = {'Accuracy': 0, 'Recall': 0, 'F1': 0, 'AUC-ROC': 0, 'Val_loss': 0}
-    num_samples = 0
+    total_loss = 0.0
+    true_labels, pred_labels, pred_probs = [], [], []
 
     with torch.no_grad():
         for inputs, targets in tqdm(val_loader, desc='Validating'):
@@ -43,33 +46,45 @@ def validate(model, val_loader, loss_fn):
             loss = loss_fn(predictions, targets)
             classes = torch.argmax(predictions, dim=1)
 
-            batch_metrics = {
-                'Accuracy': M.multiclass_accuracy(classes, targets).to(DEVICE),
-                'Recall': M.multiclass_recall(classes, targets).to(DEVICE),
-                'F1': M.multiclass_f1_score(classes, targets).to(DEVICE),
-                'AUC-ROC': M.multiclass_auroc(predictions, targets, num_classes=NUM_CLASSES).to(DEVICE)
-            }
+            true_labels.append(targets.cpu())
+            pred_labels.append(classes.cpu())
+            pred_probs.append(predictions.cpu())
+            total_loss += loss.item() * inputs.size(0)
 
-            size = inputs.size(0)
-            for name, value in batch_metrics.items():
-                metrics[name] += value.item() * size
-            metrics['Val_loss'] += loss.item() * size
-            num_samples += size
+    true_labels = torch.cat(true_labels)
+    pred_labels = torch.cat(pred_labels)
+    pred_probs = torch.cat(pred_probs)
+    loss = total_loss / len(val_loader.dataset)
 
-    avg_metrics = {name: metric / num_samples for name, metric in metrics.items()}
-    return avg_metrics
+    metrics = {
+        'Recall': M.multiclass_recall(pred_labels, true_labels).item(),
+        'F1': M.multiclass_f1_score(pred_labels, true_labels).item(),
+        'AP': M.multiclass_auprc(pred_probs, true_labels).item(),
+        'AUC-ROC': M.multiclass_auroc(pred_probs, true_labels, num_classes=NUM_CLASSES).item(),
+        'Val_loss': loss
+    }
+
+    if testing:
+        metrics['Confusion'] = M.multiclass_confusion_matrix(pred_labels, true_labels, num_classes=NUM_CLASSES)
+        metrics['PR'] = M.multiclass_precision_recall_curve(pred_probs, true_labels, num_classes=NUM_CLASSES)
+
+    return metrics
 
 
 def print_metrics(metrics):
-    names = '\t'.join(metrics.keys())
-    values = '\t'.join(f'{value:.3f}' for value in metrics.values())
+    names = '\t'.join(key for key in metrics.keys() if key not in ['Confusion', 'PR'])
+    values = '\t'.join(f'{value:.3f}' for key, value in metrics.items() if key not in ['Confusion', 'PR'])
     print(f'{names}\n{values}')
 
 
 def train(model, train_loader, val_loader, loss_fn, optimizer, scheduler, epochs, save=True):
     best_metrics = {}
     best_f1 = 0
-    metrics_history = {'Train_loss': [], 'Val_loss': [], 'Accuracy': [], 'Recall': [], 'F1': [], 'AUC-ROC': []}
+    metrics_history = {
+        'Train_loss': [], 'Val_loss': [],
+        'Recall': [], 'F1': [], 'AP': [], 'AUC-ROC': []
+    }
+
     for epoch in range(epochs):
         print(f'Epoch {epoch + 1}/{epochs}')
         train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer)
@@ -80,7 +95,7 @@ def train(model, train_loader, val_loader, loss_fn, optimizer, scheduler, epochs
             best_f1 = f1
             best_metrics = metrics
             print('Saving the best weights...')
-            torch.save(model.state_dict(), SAVED_NAME)
+            torch.save(model.state_dict(), WEIGHTS_PATH)
         scheduler.step(val_loss)
         print_metrics(metrics)
         print('-' * 50)
@@ -93,10 +108,11 @@ def train(model, train_loader, val_loader, loss_fn, optimizer, scheduler, epochs
 
 
 def test(model, test_loader, loss_fn):
-    model.load_state_dict(torch.load(SAVED_NAME))
-    metrics = validate(model, test_loader, loss_fn)
+    model.load_state_dict(torch.load(WEIGHTS_PATH))
+    metrics = validate(model, test_loader, loss_fn, testing=True)
     print('Test metrics:')
     print_metrics(metrics)
+    return metrics
 
 
 def plot_metrics(metrics_history):
@@ -116,11 +132,42 @@ def plot_metrics(metrics_history):
             fig.delaxes(ax)
 
     plt.tight_layout()
-    plt.savefig('metrics.png')
-    print('The plot is saved as "metrics.png"')
+    plt.savefig(os.path.join(SAVE_PATH, 'metrics.png'))
+
+
+def plot_confusion_matrix(test_metrics):
+    confusion = test_metrics['Confusion']
+    row_sums = confusion.sum(axis=1, keepdims=True)
+    confusion = confusion / row_sums
+    fig, ax = plt.subplots()
+
+    sns.heatmap(confusion, annot=True, cmap='Blues', fmt='.2f', ax=ax)
+    ax.set_xlabel('Predicted labels')
+    ax.set_ylabel('True labels')
+    ax.set_title('Normalized Confusion Matrix')
+    ax.xaxis.set_ticklabels(class_mapping)
+    ax.yaxis.set_ticklabels(class_mapping)
+    plt.savefig(os.path.join(SAVE_PATH, 'confusion-matrix.png'))
+
+
+def plot_pr(test_metrics):
+    pr = test_metrics['PR']
+    fig, ax = plt.subplots()
+
+    for i in range(NUM_CLASSES):
+        precision, recall = pr[i]
+        ax.plot(recall, precision, label=class_mapping[i])
+
+    ax.set_xlabel('Recall')
+    ax.set_ylabel('Precision')
+    ax.set_title('Precision-Recall Curve')
+    ax.legend()
+    plt.savefig(os.path.join(SAVE_PATH, 'PR.png'))
 
 
 def main():
+    os.makedirs(SAVE_PATH, exist_ok=True)
+
     mel_spec = MelSpectrogram(sample_rate=SAMPLE_RATE, n_fft=1024, hop_length=512, n_mels=64).to(DEVICE)
     train_loader = create_loader(TRAIN_DIR, mel_spec, SAMPLE_RATE, NUM_SAMPLES, BATCH_SIZE)
     val_loader = create_loader(VAL_DIR, mel_spec, SAMPLE_RATE, NUM_SAMPLES, BATCH_SIZE, augment=False)
@@ -133,7 +180,9 @@ def main():
 
     metrics_history = train(model, train_loader, val_loader, loss_fn, optimizer, scheduler, EPOCHS)
     plot_metrics(metrics_history)
-    test(model, test_loader, loss_fn)
+    test_metrics = test(model, test_loader, loss_fn)
+    plot_confusion_matrix(test_metrics)
+    plot_pr(test_metrics)
 
 
 if __name__ == '__main__':
