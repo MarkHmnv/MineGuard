@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Viewer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <iframe id="map-frame" src="map.html"></iframe>
+
+    <script>
+        function updateMap() {
+            let timestamp = new Date().getTime();
+            document.getElementById('map-frame').src = 'map.html?' + timestamp;
+        }
+
+        setInterval(updateMap, 15000);
+
+        updateMap();
+    </script>
+</body>
+</html>

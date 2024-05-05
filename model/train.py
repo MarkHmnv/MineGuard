@@ -8,9 +8,10 @@ from tqdm import tqdm
 
 from util import create_loader
 from model import DualPathNet
-from constants import (DEVICE, EPOCHS, SAMPLE_RATE, TRAIN_DIR,
-                       VAL_DIR, NUM_SAMPLES, BATCH_SIZE, NUM_CLASSES, LEARNING_RATE, TEST_DIR, WEIGHTS_PATH,
-                       class_mapping, SAVE_PATH)
+from constants import (
+    DEVICE, EPOCHS, SAMPLE_RATE, TRAIN_DIR, VAL_DIR, NUM_SAMPLES, BATCH_SIZE,
+    NUM_CLASSES, LEARNING_RATE, TEST_DIR, WEIGHTS_PATH, class_mapping, SAVE_PATH
+)
 import torcheval.metrics.functional as M
 import matplotlib.pyplot as plt
 import numpy as np
@@ -72,8 +73,11 @@ def validate(model, val_loader, loss_fn, testing=False):
 
 
 def print_metrics(metrics):
-    names = '\t'.join(key for key in metrics.keys() if key not in ['Confusion', 'PR'])
-    values = '\t'.join(f'{value:.3f}' for key, value in metrics.items() if key not in ['Confusion', 'PR'])
+    keys = [key for key in metrics.keys() if key not in ['Confusion', 'PR']]
+    values = [f'{value:.3f}' for key, value in metrics.items() if key not in ['Confusion', 'PR']]
+    format_str = ' '.join('{:<10}' for _ in keys)
+    names = format_str.format(*keys)
+    values = format_str.format(*values)
     print(f'{names}\n{values}')
 
 
@@ -154,9 +158,9 @@ def plot_pr(test_metrics):
     pr = test_metrics['PR']
     fig, ax = plt.subplots()
 
-    for i in range(NUM_CLASSES):
+    for i, label in enumerate(class_mapping):
         precision, recall = pr[i]
-        ax.plot(recall, precision, label=class_mapping[i])
+        ax.plot(recall, precision, label=label)
 
     ax.set_xlabel('Recall')
     ax.set_ylabel('Precision')
