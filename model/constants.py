@@ -3,7 +3,7 @@ import os
 import torch
 
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 100
 LEARNING_RATE = 1e-3
 
 SAMPLE_RATE = 44100
