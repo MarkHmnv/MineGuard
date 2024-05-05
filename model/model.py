@@ -8,8 +8,6 @@ import torch
 import torch.nn as nn
 from torchsummary import summary
 
-from constants import NUM_CLASSES
-
 
 class DualPathNet(nn.Module):
     def __init__(self, num_classes=5):
@@ -71,5 +69,5 @@ class DualPathNet(nn.Module):
 
 
 if __name__ == "__main__":
-    model = DualPathNet(num_classes=NUM_CLASSES)
+    model = DualPathNet(num_classes=5)
     summary(model.cuda(), (1, 64, 87))
