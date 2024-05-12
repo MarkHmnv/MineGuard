@@ -8,20 +8,22 @@ from base_log import log
 
 
 class GPSModule:
-    """Class for controlling SIM7600G-H GPS module"""
+    """Class for controlling SIM7600X GPS module"""
     def __init__(self, power_key_pin=6):
         self.power_key_pin = power_key_pin
         self.ser = serial.Serial('/dev/ttyTHS1', 115200)
         self.ser.reset_input_buffer()
         self._check_start()
         # Need to call a function to set up the GPS for later use
-        self.get_gps_position()
+        self.get_gps_position(initialize=True)
 
-    def get_gps_position(self) -> tuple:
+    def get_gps_position(self, initialize=False) -> tuple:
         response = None
 
         while response is None:
             response = self._send_at_command('AT+CGPSINFO', '+CGPSINFO: ')
+            if initialize:
+                time.sleep(1)
 
         return self._convert_coordinates_to_gps(response)
 
@@ -95,7 +97,8 @@ class GPSModule:
         return latitude_degrees, longitude_degrees
 
 
-gps = GPSModule()
-lat, lon = gps.get_gps_position()
-log.info(f'Latitude: {lat:.6f}, Longitude: {lon:.6f}')
-gps.power_down()
+if __name__ == '__main__':
+    gps = GPSModule()
+    lat, lon = gps.get_gps_position()
+    log.info(f'Latitude: {lat:.6f}, Longitude: {lon:.6f}')
+    gps.power_down()

@@ -21,12 +21,12 @@ DEBUG = False
 IS_WINDOWS = platform.system() == 'Windows'
 AUDIO_VOLUME_THRESHOLD = 0.1
 CONFIDENCE_THRESHOLD = 0.4
-MIN_TIME_DIFFERENCE = 0.2
+MIN_TIME_DIFFERENCE = 0.4
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 FONT_SCALE = 0.4
 COLOR = (255, 255, 0)
 LINE_THICKNESS = 1
-RGB_CAM_INDEX = 0
+RGB_CAM_INDEX = 'nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)1920, height=(int)1080,format=(string)NV12, framerate=(fraction)30/1 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert !  appsink'
 THERMAL_CAM_INDEX = 1
 SAVE_PATH = 'output'
 
@@ -185,7 +185,7 @@ def record_metal_and_classify(indata, frames, time, status):
         save_map(landmines)
 
 
-def save_map(landmines: list[Landmine]):
+def save_map(landmines: list):
     if not landmines:
         return
     data = np.array([landmine.get_location() for landmine in landmines])
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     metal_detector_model.load_state_dict(torch.load('best.pt'))
     metal_detector_model = torch.jit.optimize_for_inference(torch.jit.script(metal_detector_model.eval()))
 
-    landmines: list[Landmine] = []
+    landmines: list = []
 
     log.info(f'Initialized in {tm.time() - start_time:.2f} seconds')
     main()
