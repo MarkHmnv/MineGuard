@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Union
 
 
 @dataclass
 class Landmine:
     classes: set
-    rgb_image: Union[str, None]
-    thermal_image: Union[str, None]
+    rgb_image: str
+    thermal_image: str
     latitude: float
     longitude: float
     detected_at: float
